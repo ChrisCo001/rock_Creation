@@ -1,0 +1,91 @@
+local ReplicatedModules = game.ReplicatedStorage.Modules
+local ParticleHandler = require(ReplicatedModules.Particles)
+local Bezier = require(ReplicatedModules.OtherBezier)
+local Tween = game:GetService("TweenService")
+local ScaleTween = require(ReplicatedModules.ScaleTween)
+
+local raycast = RaycastParams.new()
+raycast.FilterDescendantsInstances = {workspace.Visuals}
+raycast.FilterType = Enum.RaycastFilterType.Exclude
+
+
+local Projectiles = {}
+Projectiles.__index = Projectiles
+
+function Projectiles.New(model,StartPos,EndPos)
+	local self = setmetatable({},Projectiles)
+	self.Model = model:Clone()
+	self.Model.CFrame = CFrame.new(StartPos,EndPos)
+	self.EndPos = EndPos
+	return self 
+end
+
+
+function Projectiles:Spawn(Time,Method)
+	if Method == 1 then 
+		self.Model.Parent = game.workspace.Visuals
+		if self.Model:FindFirstChild("StartUp") then 
+			ParticleHandler.StartUP(self.Model.StartUp)
+		end
+		task.wait(Time)
+		if self.Model:FindFirstChild("ON") then 
+			ParticleHandler.ON(self.Model.ON)
+		end
+	end
+	if Method == 2 then 
+		local Pos = self.Model.Position
+		local ray = workspace:Raycast(Pos,Vector3.new(0,-1000,0),raycast)
+		local Distance = (Pos - ray.Position).Magnitude 
+		local NewPos = Vector3.new(Pos.x, Pos.y - Distance - 2, Pos.z)
+		self.Model.Position = NewPos
+		self.Model.Parent = game.Workspace.Visuals
+		if self.Model:FindFirstChild("ON") then 
+			ParticleHandler.ON(self.Model.ON)
+		end
+		return ray
+	end
+
+end
+
+
+function Projectiles:MoveToTw(speed)
+
+	local Distance = (self.Model.Position - self.EndPos).Magnitude
+	local Time = Distance/speed
+	local tween = Tween:Create(self.Model,TweenInfo.new(Time,Enum.EasingStyle.Linear),{Position = self.EndPos})
+	tween:Play()
+	tween.Completed:Wait()
+
+end
+
+function Projectiles:MoveToBe()
+	local Model = self.Model
+	local Start = self.Model.Position
+	local End = self.EndPos
+	local p1 = CFrame.new(Start + Vector3.new(0,12,0), End)
+	local p2 = CFrame.new(p1.Position + Model.CFrame.LookVector * 4) * CFrame.new(0,9,0)
+	local Distance = (p2.Position - End).Magnitude
+	local p3 = CFrame.new(p2.Position + Model.CFrame.LookVector * Distance/2 )
+	local Distance2 = (p3.Position - End).Magnitude
+	local p4 = CFrame.new(p3.Position + Model.CFrame.LookVector * Distance2/2)
+	local p5 = End 	
+	local NewBezier = Bezier.new(Start,p1.Position,p2.Position,p3.Position,p4.Position,p5)
+	local velocity = 100
+	local Time = (Start-End).Magnitude/velocity
+	local Tween = NewBezier:CreateCFrameTween(Model,{"CFrame"}, TweenInfo.new(Time, Enum.EasingStyle.Linear,Enum.EasingDirection.Out,0,false,0))
+	Tween:Play()
+	return Time
+end
+
+function Projectiles:Part()
+	ParticleHandler.Deleter(self.Model.ON)
+end 
+function Projectiles:Deleter()
+	if self.Model then 
+		self.Model:Destroy()
+		self.Model = nil
+	end
+end
+
+
+return Projectiles
