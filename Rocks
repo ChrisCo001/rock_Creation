@@ -1,0 +1,128 @@
+local module = {}
+
+local raycast = RaycastParams.new()
+raycast.FilterDescendantsInstances = {workspace.Visuals}
+raycast.FilterType = Enum.RaycastFilterType.Exclude
+local tween = game:GetService("TweenService")
+
+local function randomDirection(normal)
+
+	local dir = Vector3.new(
+		math.random(-100, 100) / 100,
+		math.random(-100, 100) / 100,
+		math.random(-100, 100) / 100
+	).Unit
+
+	if dir:Dot(normal) then 
+		dir = -dir 
+	end
+
+	return dir 
+
+end
+
+function module.Rocks(ray,height,radius,N,size,power,value)
+
+	local faces = Enum.NormalId:GetEnumItems()
+
+	local PartHitted = ray.Instance
+	local HitPosition = ray.Position
+	local Normal = ray.Normal
+
+	local Tip = HitPosition + Normal * height
+
+	local arbitrary = Vector3.new(1,0,0)
+	if math.abs(Normal:Dot(arbitrary)) > 0.99 then
+		arbitrary = Vector3.new(0,0,1)
+	end
+	local tangent1 = Normal:Cross(arbitrary).Unit
+	local tangent2 = Normal:Cross(tangent1).Unit
+	local BaseCenter = Tip - Normal * height
+
+	local function CreateP(results)
+
+		local part = Instance.new("Part")
+		part.Material = PartHitted.Material 
+		part.Color = PartHitted.Color
+		local Dir = results.Normal.Unit * 1
+		local Nsize = Vector3.new(size.x+3,math.random(size.y,size.y+1),math.random(size.z,size.z+2))
+		part.Size = Nsize*2.5
+		part.Anchored = true
+		part.CanCollide = false
+		part.Color = PartHitted.Color
+		part.Parent = game.Workspace.Visuals
+		part.CFrame = CFrame.lookAt(results.Position - Dir*4, Tip, results.Normal)
+		for _, v in pairs(PartHitted:GetChildren()) do 
+			if v:IsA("Decal") or v:IsA("Texture") then 				
+				for _, face in ipairs(faces) do
+					local clone = v:Clone()
+					clone.Face = face
+					clone.Parent = part
+				end
+			end
+		end
+
+		local goal = {Position = results.Position-Dir*1 }
+		local goal2 = {Position = part.Position-Dir*8}
+		local partTwInfo = TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
+		local partTwInfo2 = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		local partSmall = tween:Create(part, partTwInfo,goal)
+		local reverse = tween:Create(part, partTwInfo2,goal2)
+		task.spawn(function()
+			partSmall:Play()
+			wait(2)
+			reverse:Play()
+			wait(1)
+			part:Destroy()
+		end)
+
+	end
+	local function SmallRocks()
+		for i = 1, 1 do 
+			local Rock = Instance.new("Part")
+			Rock.Size = size
+			Rock.Position = HitPosition
+			Rock.CanCollide = false
+			Rock.Anchored = false
+
+			for _, v in pairs(PartHitted:GetChildren()) do 
+				if v:IsA("SurfaceAppearance") or v:IsA("Decal") or v:IsA("Texture") then 
+					local clone = v:Clone()
+					clone.Parent = Rock
+					Rock.Color = PartHitted.Color
+				end
+			end
+
+			local BoVel = Instance.new("BodyVelocity")
+			local Dir = randomDirection(Normal)
+			BoVel.Velocity = Dir * power
+			BoVel.MaxForce = Vector3.new(math.huge,math.huge,math.huge)
+			BoVel.P = math.huge
+			BoVel.Parent = Rock
+
+			Rock.Parent = workspace.Visuals
+			task.spawn(function()
+				wait(0.5)
+				BoVel:Destroy()
+				Rock.CanCollide = true
+				wait(2)
+				Rock:Destroy()
+			end)
+		end
+	end 
+
+	for i = 0, (N - 1) do 
+		local angle = 2 * math.pi * i / N
+		local dir = (BaseCenter + tangent1 * math.cos(angle) * radius + tangent2 * math.sin(angle) * radius - Tip).Unit
+		local distance = 50
+		local result = workspace:Raycast(Tip, dir * distance, raycast)
+		if result and value then
+			SmallRocks()
+			CreateP(result)
+		else 
+			SmallRocks()
+		end
+	end
+end
+
+return module
